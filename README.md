@@ -1,3 +1,6 @@
+**Open-Source Reference Architecture & Disclaimer**
+This repository contains an independent, open-source reference architecture developed entirely by the author to demonstrate general modern cloud infrastructure concepts. It is not affiliated with, derived from, or endorsed by any past or present employer. This code is provided as-is for educational and architectural purposes, and anyone (including global engineering teams, community members, or enterprises) is welcome to clone, adapt, and build upon it to solve their own specific infrastructure challenges.
+
 # AWS ECR FinOps Artifact Optimizer
 
 A lightweight Python utility that reclaims AWS Elastic Container Registry (ECR) storage by pruning untagged and aged container images across your repositories — safely, predictably, and on your terms.
