@@ -1,0 +1,5 @@
+# Production dependencies for the FinOps ECR Artifact Optimizer
+# Pinned with compatible-release (~=) constraints for reproducible, stable builds.
+
+boto3~=1.34          # AWS SDK for Python (ECR client)
+PyYAML~=6.0          # Parsing config.yaml

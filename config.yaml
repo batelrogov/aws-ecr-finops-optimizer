@@ -1,0 +1,12 @@
+# FinOps ECR Artifact Optimizer configuration
+
+# Delete images older than this many days
+retention_days: 30
+
+# When true, only report what would be deleted without making changes
+dry_run: true
+
+# Repositories to skip during cleanup
+excluded_repositories:
+  - my-critical-service
+  - shared-base-images
