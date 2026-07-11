@@ -23,12 +23,15 @@ def load_config(path: Path = CONFIG_PATH) -> dict:
     return config
 
 
-def get_stale_images(repo_name: str, retention_days: int, ecr_client=None) -> list:
+def get_stale_images(repo_name: str, retention_days: int, excluded_tags: list = None, ecr_client=None) -> list:
     """Return image digests in a repository that are untagged or older than retention_days.
+
+    Protects critical production images containing strings defined in the excluded_tags list.
 
     Args:
         repo_name: Name of the ECR repository to scan.
         retention_days: Images pushed more than this many days ago are stale.
+        excluded_tags: Optional list of regex pattern strings or static tags to preserve (e.g., ['prod', 'stable']).
         ecr_client: Optional boto3 ECR client; one is created if not provided.
 
     Returns:
@@ -37,6 +40,7 @@ def get_stale_images(repo_name: str, retention_days: int, ecr_client=None) -> li
     if ecr_client is None:
         ecr_client = boto3.client("ecr")
 
+    excluded_tags = excluded_tags or []
     cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
     stale_digests = []
 
@@ -47,9 +51,19 @@ def get_stale_images(repo_name: str, retention_days: int, ecr_client=None) -> li
             if digest is None:
                 continue
 
-            is_untagged = not image.get("imageTags")
+            tags = image.get("imageTags", [])
+            is_untagged = not tags
             pushed_at = image.get("imagePushedAt")
             is_expired = pushed_at is not None and pushed_at < cutoff
+
+            # Check if any tag matches the protection list (e.g., contains 'prod', 'stable', etc.)
+            is_protected = any(
+                any(ex_tag in t.lower() for ex_tag in excluded_tags) for t in tags
+            )
+
+            if is_protected:
+                logger.debug("Image %s in %s is protected by tag(s): %s. Skipping lifecycle evaluation.", digest, repo_name, tags)
+                continue
 
             if is_untagged or is_expired:
                 stale_digests.append(digest)
@@ -163,10 +177,12 @@ def main(argv: list = None) -> None:
     )
     dry_run = args.dry_run if args.dry_run is not None else config.get("dry_run", True)
     excluded_repositories = config.get("excluded_repositories", []) or []
+    excluded_tags = config.get("excluded_tags", []) or []
 
     logger.info("Retention period: %s days", retention_days)
     logger.info("Dry run: %s", dry_run)
     logger.info("Excluded repositories: %s", excluded_repositories)
+    logger.info("Excluded/Protected image tags: %s", excluded_tags)
 
     ecr_client = boto3.client("ecr")
     logger.info("Initialized boto3 ECR client in region %s", ecr_client.meta.region_name)
@@ -182,7 +198,7 @@ def main(argv: list = None) -> None:
                 logger.info("Skipping excluded repository %s", repo_name)
                 continue
 
-            stale_images = get_stale_images(repo_name, retention_days, ecr_client)
+            stale_images = get_stale_images(repo_name, retention_days, excluded_tags, ecr_client)
             total_processed += clean_repository(
                 repo_name, stale_images, dry_run, ecr_client
             )
